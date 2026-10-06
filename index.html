@@ -98,13 +98,29 @@
 
   <script>
 // --- IMPORTANT: PASTE YOUR APP SCRIPT URL HERE ---
-    const WEBHOOK = "https://script.google.com/macros/s/AKfycbxDCjMCjsAlKosFysiDDw5Y8T-705IZAQmd68_eMrP6dAbWjekV59U5VCfkCLvDi6vJ/exec";
+    const WEBHOOK = "https://script.google.com/macros/s/AKfycbyA1aSE9YJRz-dfDJowQSc10Va_yxQ8AUVHG0ojuBnvnvr1HULdMEm8GBBUyPtfUnPz/exec";
     const colorHex = { "Red": "#ef4444", "Blue": "#3b82f6", "Green": "#22c55e", "Yellow": "#ca8a04" };
 
     const formSection = document.getElementById('form-section');
     const dashboardSection = document.getElementById('dashboard-section');
     const submitBtn = document.getElementById('submit-btn');
     const refreshBtn = document.getElementById('refresh-btn');
+
+    // HELPER: Automatisch opnieuw proberen bij een netwerkfout of hapering van Google
+    async function fetchWithRetry(url, options, retries = 3) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch(url, options);
+          const text = await res.text();
+          // Controleer of de output daadwerkelijk JSON is, en geen Google HTML foutmelding
+          return JSON.parse(text); 
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          // Wacht 1 seconde extra voor elke gefaalde poging (backoff)
+          await new Promise(r => setTimeout(r, 1000 * (i + 1))); 
+        }
+      }
+    }
 
     let userData = JSON.parse(localStorage.getItem('teamEventData'));
     if (userData) {
@@ -123,25 +139,23 @@
       const userId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
 
       try {
-        const res = await fetch(WEBHOOK, {
+        const data = await fetchWithRetry(WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: "register", userId, name, teamName })
         });
-        const data = await res.json();
         
         if (data.success) {
           userData = { name, teamName, color: data.color };
           localStorage.setItem('teamEventData', JSON.stringify(userData)); 
           showDashboard(userData);
         } else {
-          // BEVEILIGING: Laat een error zien als de naam al bestaat in de sheet
           alert(data.message || "Er is een fout opgetreden bij het aanmelden.");
           submitBtn.disabled = false;
           submitBtn.textContent = "Join & Get Color";
         }
       } catch (e) {
-        alert("Error submitting data. Please try again.");
+        alert("Server is even te druk. Probeer het over een paar seconden opnieuw.");
         submitBtn.disabled = false;
         submitBtn.textContent = "Join & Get Color";
       }
@@ -171,15 +185,17 @@
       if (!userData) return;
       const list = document.getElementById('dynamic-team-list');
       const membersContainer = document.getElementById('dynamic-members-list');
-      refreshBtn.textContent = "↻ ...";
+      
+      const originalBtnText = refreshBtn.textContent;
+      refreshBtn.textContent = "↻ Verversen...";
+      refreshBtn.disabled = true;
       
       try {
-        const res = await fetch(WEBHOOK, {
+        const responseData = await fetchWithRetry(WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: "getTeams" })
         });
-        const responseData = await res.json();
         
         if (responseData.success) {
           const allData = responseData.data;
@@ -238,10 +254,10 @@
           });
         }
       } catch (e) {
-        list.innerHTML = "<li>Failed to load data.</li>";
-        membersContainer.innerHTML = "Failed to load teams.";
+        list.innerHTML = "<li style='color:red;'>Failed to load data na meerdere pogingen. Probeer handmatig te vernieuwen.</li>";
       } finally {
-        refreshBtn.textContent = "↻ Refresh";
+        refreshBtn.textContent = originalBtnText;
+        refreshBtn.disabled = false;
       }
     }
   </script>
