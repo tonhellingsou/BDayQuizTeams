@@ -97,8 +97,8 @@
   </div>
 
   <script>
-    // --- IMPORTANT: PASTE YOUR APP SCRIPT URL HERE ---
-    const WEBHOOK = "https://script.google.com/macros/s/AKfycbyY25Y2E0hr8SJseunAI1QbDNhn8tbeJepK0VJTreFoNga56CZ_EKTc0bgtpfRduEGa/exec";
+// --- IMPORTANT: PASTE YOUR APP SCRIPT URL HERE ---
+    const WEBHOOK = "https://script.google.com/macros/s/AKfycbxDCjMCjsAlKosFysiDDw5Y8T-705IZAQmd68_eMrP6dAbWjekV59U5VCfkCLvDi6vJ/exec";
     const colorHex = { "Red": "#ef4444", "Blue": "#3b82f6", "Green": "#22c55e", "Yellow": "#ca8a04" };
 
     const formSection = document.getElementById('form-section');
@@ -134,6 +134,11 @@
           userData = { name, teamName, color: data.color };
           localStorage.setItem('teamEventData', JSON.stringify(userData)); 
           showDashboard(userData);
+        } else {
+          // BEVEILIGING: Laat een error zien als de naam al bestaat in de sheet
+          alert(data.message || "Er is een fout opgetreden bij het aanmelden.");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Join & Get Color";
         }
       } catch (e) {
         alert("Error submitting data. Please try again.");
@@ -179,7 +184,6 @@
         if (responseData.success) {
           const allData = responseData.data;
           
-          // 1. Render Proposed Team Names ONLY for the user's assigned color
           list.innerHTML = "";
           const myTeamIdeas = allData[userData.color].teams;
           
@@ -195,7 +199,6 @@
             });
           }
 
-          // 2. Render Team Members grouped by Color
           membersContainer.innerHTML = "";
           const colors = ["Red", "Blue", "Green", "Yellow"];
 
