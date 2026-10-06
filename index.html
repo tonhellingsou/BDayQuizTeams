@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Team Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    /* Styling inspired by your previous project */
+    body { 
+      background: #f3f3f3; 
+      margin: 0; 
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+    }
+    .page-container { 
+      max-width: 600px; 
+      margin: 3rem auto; 
+      padding: 2rem; 
+      background: #fff; 
+      border: 1px solid #d8dbe0; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 10px rgba(0,0,0,.04); 
+      box-sizing: border-box;
+    }
+    @media (max-width: 600px) {
+      .page-container { margin: 1rem; padding: 1.5rem; }
+    }
+    .field-card { margin-bottom: 1.5rem; }
+    label { display: block; margin-bottom: .4rem; font-weight: 600; }
+    input[type="text"] { 
+      width: 100%; 
+      padding: 12px; 
+      font-size: 1rem;
+      border: 1px solid #d8dbe0; 
+      border-radius: 8px; 
+      background: #f9fafb;
+      box-sizing: border-box; 
+    }
+    input[type="text"]:focus {
+      background: #fff; outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+    }
+    .btn-primary { 
+      width: 100%; 
+      padding: 1rem; 
+      border-radius: 10px; 
+      border: none; 
+      background: #2563eb; 
+      color: #fff; 
+      font-weight: 600; 
+      font-size: 1rem;
+      cursor: pointer; 
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    
+    .color-box { 
+      padding: 2rem; 
+      text-align: center; 
+      border-radius: 12px; 
+      margin: 1.5rem 0; 
+      color: white; 
+      font-size: 1.5rem; 
+      font-weight: bold; 
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+    }
+    .bg-red { background-color: #ef4444; }
+    .bg-blue { background-color: #3b82f6; }
+    .bg-green { background-color: #22c55e; }
+    .bg-yellow { background-color: #eab308; color: #000; }
+    
+    .hidden { display: none; }
+    .muted { color: #666; font-size: 0.95rem; }
+    .team-list { list-style: none; padding: 0; max-height: 250px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;}
+    .team-list li { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+    .team-list li:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+
+  <!-- REGISTRATION FORM -->
+  <div class="page-container" id="form-section">
+    <h1 style="margin-top: 0; text-align: center;">Join the Event</h1>
+    <p class="muted" style="text-align: center; margin-bottom: 2rem;">Fill in your details to get assigned to a team color.</p>
+    
+    <div class="field-card">
+      <label for="name">Your Name</label>
+      <input type="text" id="name" placeholder="E.g. Jane Doe">
+    </div>
+    <div class="field-card">
+      <label for="teamName">Proposed Team Name</label>
+      <input type="text" id="teamName" placeholder="E.g. The Code Crushers">
+    </div>
+    <button id="submit-btn" class="btn-primary">Join & Get Color</button>
+  </div>
+
+  <!-- DASHBOARD / REFRESH VIEW -->
+  <div class="page-container hidden" id="dashboard-section">
+    <h2 style="margin-top: 0; text-align: center;">Welcome, <span id="display-name"></span>!</h2>
+    <p style="text-align: center; margin-top: 0;">Your team name idea: <strong id="display-team"></strong></p>
+    
+    <div id="color-display" class="color-box">
+      You are on the <span id="display-color-text"></span> team
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 2rem 0;">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="margin: 0;">All Proposed Names</h3>
+      <button id="refresh-btn" style="padding: 0.4rem 0.8rem; background: #e5e7eb; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">↻ Refresh</button>
+    </div>
+    
+    <ul class="team-list" id="dynamic-team-list">
+      <li>Loading...</li>
+    </ul>
+  </div>
+
+  <script>
+    // --- IMPORTANT: PASTE YOUR APP SCRIPT URL HERE ---
+    const WEBHOOK = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+    const formSection = document.getElementById('form-section');
+    const dashboardSection = document.getElementById('dashboard-section');
+    const submitBtn = document.getElementById('submit-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    // 1. Check if user already exists on this device (handles page refresh)
+    let userData = JSON.parse(localStorage.getItem('teamEventData'));
+    if (userData) {
+      showDashboard(userData);
+    }
+
+    // 2. Submit new user
+    submitBtn.addEventListener('click', async () => {
+      const name = document.getElementById('name').value.trim();
+      const teamName = document.getElementById('teamName').value.trim();
+
+      if (!name || !teamName) return alert("Please fill in both fields.");
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Assigning Color...";
+
+      const userId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+
+      try {
+        // We use text/plain to bypass complex CORS preflight issues
+        const res = await fetch(WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: "register", userId, name, teamName })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          userData = { name, teamName, color: data.color };
+          localStorage.setItem('teamEventData', JSON.stringify(userData)); // Save locally
+          showDashboard(userData);
+        }
+      } catch (e) {
+        alert("Error submitting data. Please try again.");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Join & Get Color";
+      }
+    });
+
+    // 3. Manual refresh button for the dynamic team list
+    refreshBtn.addEventListener('click', fetchTeams);
+
+    // 4. Update the UI and transition to dashboard
+    function showDashboard(data) {
+      formSection.classList.add('hidden');
+      dashboardSection.classList.remove('hidden');
+
+      document.getElementById('display-name').textContent = data.name;
+      document.getElementById('display-team').textContent = data.teamName;
+      
+      const colorBox = document.getElementById('color-display');
+      colorBox.className = "color-box bg-" + data.color.toLowerCase();
+      document.getElementById('display-color-text').textContent = data.color;
+
+      fetchTeams();
+    }
+
+    // 5. Fetch the dynamic list of team names from the sheet
+    async function fetchTeams() {
+      const list = document.getElementById('dynamic-team-list');
+      refreshBtn.textContent = "↻ ...";
+      
+      try {
+        const res = await fetch(WEBHOOK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: "getTeams" })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          list.innerHTML = "";
+          if (data.teams.length === 0) {
+            list.innerHTML = "<li>No teams proposed yet.</li>";
+          } else {
+            data.teams.forEach(t => {
+              const li = document.createElement('li');
+              li.textContent = t;
+              list.appendChild(li);
+            });
+          }
+        }
+      } catch (e) {
+        list.innerHTML = "<li>Failed to load teams.</li>";
+      } finally {
+        refreshBtn.textContent = "↻ Refresh";
+      }
+    }
+  </script>
+</body>
+</html>
