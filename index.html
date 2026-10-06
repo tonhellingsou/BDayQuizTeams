@@ -94,7 +94,7 @@
     <button id="submit-btn" class="btn-primary">Join & Get Color</button>
   </div>
 
-  <!-- DASHBOARD / REFRESH VIEW -->
+<!-- DASHBOARD / REFRESH VIEW -->
   <div class="page-container hidden" id="dashboard-section">
     <h2 style="margin-top: 0; text-align: center;">Welcome, <span id="display-name"></span>!</h2>
     <p style="text-align: center; margin-top: 0;">Your team name idea: <strong id="display-team"></strong></p>
@@ -106,31 +106,43 @@
     <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 2rem 0;">
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-      <h3 style="margin: 0;">All Proposed Names</h3>
+      <h3 style="margin: 0;">Event Overview</h3>
       <button id="refresh-btn" style="padding: 0.4rem 0.8rem; background: #e5e7eb; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">↻ Refresh</button>
     </div>
     
-    <ul class="team-list" id="dynamic-team-list">
-      <li>Loading...</li>
-    </ul>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2rem;">
+      <!-- Column 1: Team Names -->
+      <div>
+        <h4 style="margin-top: 0;">Proposed Team Names</h4>
+        <ul class="team-list" id="dynamic-team-list">
+          <li>Loading...</li>
+        </ul>
+      </div>
+
+      <!-- Column 2: Assigned Members -->
+      <div>
+        <h4 style="margin-top: 0;">Assigned Teams</h4>
+        <div id="dynamic-members-list" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem;">
+          Loading...
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     // --- IMPORTANT: PASTE YOUR APP SCRIPT URL HERE ---
-    const WEBHOOK = "https://script.google.com/macros/s/AKfycbzMRGxlBDxNq1gW6ENbm3ECvNL5JnWLHyK3B30O2QRRQheusfeA_D2OofTG1CJvpRD0/exec";
+    const WEBHOOK = "https://script.google.com/macros/s/AKfycbxXqa0YQrYR4I3kH2NtCRAbdI0L8wd0J1eVAelBlc9BSerxKjJvmhJrWLKIWbcTXjYy/exec";
 
     const formSection = document.getElementById('form-section');
     const dashboardSection = document.getElementById('dashboard-section');
     const submitBtn = document.getElementById('submit-btn');
     const refreshBtn = document.getElementById('refresh-btn');
 
-    // 1. Check if user already exists on this device (handles page refresh)
     let userData = JSON.parse(localStorage.getItem('teamEventData'));
     if (userData) {
       showDashboard(userData);
     }
 
-    // 2. Submit new user
     submitBtn.addEventListener('click', async () => {
       const name = document.getElementById('name').value.trim();
       const teamName = document.getElementById('teamName').value.trim();
@@ -143,7 +155,6 @@
       const userId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
 
       try {
-        // We use text/plain to bypass complex CORS preflight issues
         const res = await fetch(WEBHOOK, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -153,7 +164,7 @@
         
         if (data.success) {
           userData = { name, teamName, color: data.color };
-          localStorage.setItem('teamEventData', JSON.stringify(userData)); // Save locally
+          localStorage.setItem('teamEventData', JSON.stringify(userData)); 
           showDashboard(userData);
         }
       } catch (e) {
@@ -163,10 +174,8 @@
       }
     });
 
-    // 3. Manual refresh button for the dynamic team list
     refreshBtn.addEventListener('click', fetchTeams);
 
-    // 4. Update the UI and transition to dashboard
     function showDashboard(data) {
       formSection.classList.add('hidden');
       dashboardSection.classList.remove('hidden');
@@ -181,9 +190,9 @@
       fetchTeams();
     }
 
-    // 5. Fetch the dynamic list of team names from the sheet
     async function fetchTeams() {
       const list = document.getElementById('dynamic-team-list');
+      const membersContainer = document.getElementById('dynamic-members-list');
       refreshBtn.textContent = "↻ ...";
       
       try {
@@ -195,6 +204,7 @@
         const data = await res.json();
         
         if (data.success) {
+          // 1. Render Proposed Team Names
           list.innerHTML = "";
           if (data.teams.length === 0) {
             list.innerHTML = "<li>No teams proposed yet.</li>";
@@ -205,13 +215,52 @@
               list.appendChild(li);
             });
           }
+
+          // 2. Render Team Members grouped by Color
+          membersContainer.innerHTML = "";
+          const colors = ["Red", "Blue", "Green", "Yellow"];
+          const colorHex = { "Red": "#ef4444", "Blue": "#3b82f6", "Green": "#22c55e", "Yellow": "#ca8a04" };
+
+          colors.forEach(color => {
+            const teamDiv = document.createElement('div');
+            teamDiv.style.marginBottom = "1rem";
+            
+            const header = document.createElement('h5');
+            header.style.margin = "0 0 0.5rem 0";
+            header.style.color = colorHex[color];
+            header.textContent = color + " Team";
+            teamDiv.appendChild(header);
+
+            const ul = document.createElement('ul');
+            ul.style.margin = "0";
+            ul.style.paddingLeft = "1.5rem";
+
+            const membersList = data.members[color];
+            if (membersList && membersList.length > 0) {
+              membersList.forEach(m => {
+                const li = document.createElement('li');
+                li.textContent = m;
+                li.style.fontSize = "0.95rem";
+                ul.appendChild(li);
+              });
+            } else {
+              const li = document.createElement('li');
+              li.textContent = "Waiting for players...";
+              li.style.fontSize = "0.9rem";
+              li.style.color = "#9ca3af";
+              li.style.fontStyle = "italic";
+              ul.appendChild(li);
+            }
+            
+            teamDiv.appendChild(ul);
+            membersContainer.appendChild(teamDiv);
+          });
         }
       } catch (e) {
-        list.innerHTML = "<li>Failed to load teams.</li>";
+        list.innerHTML = "<li>Failed to load data.</li>";
+        membersContainer.innerHTML = "Failed to load teams.";
       } finally {
         refreshBtn.textContent = "↻ Refresh";
       }
     }
   </script>
-</body>
-</html>
