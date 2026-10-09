@@ -100,7 +100,7 @@
   <script>
 // --- IMPORTANT: PASTE YOUR APP SCRIPT URL HERE ---
     const WEBHOOK = "https://script.google.com/macros/s/AKfycbxO51EOBrHoDTT8Xg_CSAYolnQooiHthIkHjIaVV8KLFhgi2z-RE53EO378RShX84FY/exec";
-    const colorHex = { "Red": "#ef4444", "Blue": "#3b82f6", "Green": "#22c55e", "Yellow": "#ca8a04" };
+    const colorHex = { "Red": "#ef4444", "Blue": "#3b82f6", "Green": "#22c55e", "Yellow": "#ca8a04", "Pink": "#ec4899" };
 
     const formSection = document.getElementById('form-section');
     const dashboardSection = document.getElementById('dashboard-section');
@@ -217,7 +217,7 @@
           }
 
           membersContainer.innerHTML = "";
-          const colors = ["Red", "Blue", "Green", "Yellow"];
+          const colors = ["Red", "Blue", "Green", "Yellow", "Pink"];
 
           colors.forEach(color => {
             const teamDiv = document.createElement('div');
